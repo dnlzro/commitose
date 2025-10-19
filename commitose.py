@@ -869,7 +869,7 @@ def main() -> None:
         print(f"\nRepository location: {config.repo_path}")
         print("To push to GitHub:")
         print(f"  cd {config.repo_path}")
-        print(f"  git remote add origin <url>")
+        print("  git remote add origin <url>")
         print(f"  git push -u origin {config.branch}")
 
 
