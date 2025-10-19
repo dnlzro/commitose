@@ -21,6 +21,8 @@ Markov chain-based commit history simulator for realistic GitHub contribution gr
 
 ## Installation
 
+**Prerequisite:** Python 3+
+
 ```bash
 git clone https://github.com/dnlzro/commitose.git
 cd commitose
