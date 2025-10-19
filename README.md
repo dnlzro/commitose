@@ -56,6 +56,8 @@ chmod +x commitose.py
   --vacation 2025-12-20:2026-01-02
 ```
 
+**See also:** [Advanced configuration](#advanced-configuration)
+
 ## Command line options
 
 - `--user-name NAME`: Git user name (will prompt to use Git config if available)
