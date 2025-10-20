@@ -118,7 +118,7 @@ For fine-grained control, create a JSON config file specifying one or more of th
     [0.3, 0.5, 0.2],
     [0.1, 0.4, 0.5]
   ],
-  "session_windows": [[10, 30], [15, 0], [20, 30]],
+  "session_starts": [[10, 30], [15, 0], [20, 30]],
   "session_std_minutes": 60,
   "min_gap_seconds": 45,
   "max_gap_seconds": 2400
@@ -163,6 +163,6 @@ The generator uses a 4-state Markov chain (off, quiet, normal, busy) to model re
 
 - `session_count_distribution`: Probability of having 1, 2, or 3 work sessions per state
   - Each row `[P(1), P(2), P(3)]` must sum to 1.0
-- `session_windows`: Typical session start times, as `[hour, minute]` pairs in 24-hour format (e.g., `[13, 30]` = 1:30 PM)
-- `session_std_minutes`: Standard deviation (in minutes) for jitter around `session_windows` times
+- `session_starts`: Typical session start times, as `[hour, minute]` pairs in 24-hour format (e.g., `[13, 30]` = 1:30 PM)
+- `session_std_minutes`: Standard deviation (in minutes) for jitter around `session_starts` times
 - `min_gap_seconds`, `max_gap_seconds`: Range for inter-commit gaps within a session (sampled from log-normal distribution)

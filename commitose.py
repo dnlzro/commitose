@@ -53,7 +53,7 @@ class Config:
     state_zero_inflation: List[float]  # Probability of zero commits
 
     # Intra-day timing
-    session_windows: List[Tuple[int, int]]  # (hour, minute) for session starts
+    session_starts: List[Tuple[int, int]]  # (hour, minute) for session starts
     session_std_minutes: float  # Jitter around session times
     session_count_distribution: List[List[float]]  # Sessions per state
     min_gap_seconds: int  # Between commits
@@ -370,7 +370,7 @@ class CommitGenerator:
     def _sample_session_start(self, date: datetime.date) -> datetime:
         """Sample a session start time with jitter."""
         # Choose random session window
-        hour, minute = self.rng.choice(self.config.session_windows)
+        hour, minute = self.rng.choice(self.config.session_starts)
         base_minutes = hour * 60 + minute
 
         # Add Gaussian jitter
@@ -737,7 +737,7 @@ def create_default_config() -> Config:
         state_means=[0, 1, 3, 7],
         state_dispersion=1.2,
         state_zero_inflation=[1.0, 0.3, 0.1, 0.05],
-        session_windows=[(10, 30), (15, 0), (20, 30)],
+        session_starts=[(10, 30), (15, 0), (20, 30)],
         session_std_minutes=60,
         min_gap_seconds=45,
         max_gap_seconds=40 * 60,
