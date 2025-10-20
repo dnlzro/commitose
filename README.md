@@ -16,7 +16,7 @@ Markov chain-based commit history simulator for realistic GitHub contribution gr
 - **Markov chain timing:** 4-state model (off, quiet, normal, busy) for realistic activity patterns
 - **Session clustering:** Commits grouped into 1-3 work sessions per day with realistic gaps
 - **Weekly rhythms:** Configurable weekday vs. weekend activity
-- **Vacation periods:** Specify inactive time blocks
+- **Activity scaling:** Scale commit activity by any factor during specific periods (vacations, sprints, etc.)
 - **Adaptive visualization:** Preview commit graph with automatic terminal width handling
 
 ## Installation
@@ -48,12 +48,13 @@ chmod +x commitose.py
   --user-name "Daniel Lazaro" \
   --user-email "git@dlazaro.ca"
 
-# Add vacation periods
+# Scale activity for specific periods
 ./commitose.py \
   --start-date 2025-01-01 \
   --end-date 2025-12-31 \
-  --vacation 2025-07-15:2025-07-29 \
-  --vacation 2025-12-20:2026-01-02
+  --break 2025-07-15:2025-07-29 \
+  --break 2025-12-20:2026-01-02 \
+  --break 2025-03-01:2025-03-15:2.0
 ```
 
 **See also:** [Advanced configuration](#advanced-configuration)
@@ -64,7 +65,8 @@ chmod +x commitose.py
 - `--user-email EMAIL`: Git user email (will prompt to use Git config if available)
 - `--start-date YYYY-MM-DD`: Start date for commit generation (default: 365 days ago)
 - `--end-date YYYY-MM-DD`: End date for commit generation (default: today)
-- `--vacation START:END`: Vacation period (repeatable)
+- `--break START:END[:FACTOR]`: Activity scaling period (repeatable)
+  - Factor defaults to `0` (full vacation); e.g., `0.5` = half activity, `2.0` = double activity
 - `--seed INT`: Random seed for reproducibility
 - `--dry-run`: Preview without creating commits
 - `--repo-path PATH`: Repository location (default: `./commits-repo`)
@@ -100,7 +102,7 @@ For fine-grained control, create a JSON config file specifying one or more of th
   "timezone": "UTC",
   "random_seed": 42,
   "weekly_weights": [1.0, 1.0, 1.0, 1.0, 1.0, 1.0, 1.0],
-  "vacation_blocks": [],
+  "breaks": [],
   "transition_matrix": [
     [0.85, 0.10, 0.05, 0.00],
     [0.15, 0.60, 0.20, 0.05],
@@ -140,8 +142,10 @@ For fine-grained control, create a JSON config file specifying one or more of th
 
 - `weekly_weights`: Relative activity levels for each day (`[Mon, Tue, Wed, Thu, Fri, Sat, Sun]`)
   - Values are multiplied against state means (see below)
-- `vacation_blocks`: List of inactive date ranges
-  - e.g., `[["2025-07-15", "2025-07-29"], ...]`
+- `breaks`: List of time periods with scaled activity
+  - Each entry: `{"start": "2025-07-15", "end": "2025-07-29", "factor": 0}`
+  - Factor examples: `0` = no commits (vacation), `0.5` = half activity, `2.0` = double activity (sprint)
+  - Breaks cannot overlap
 
 #### Markov chain (daily state)
 

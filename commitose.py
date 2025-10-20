@@ -25,6 +25,15 @@ class Commit:
 
 
 @dataclass
+class Break:
+    """A time period with scaled commit activity."""
+
+    start: datetime
+    end: datetime
+    factor: float
+
+
+@dataclass
 class Config:
     """Configuration for commit generation."""
 
@@ -35,7 +44,7 @@ class Config:
 
     # Activity patterns
     weekly_weights: List[float]  # Mon-Sun activity multipliers
-    vacation_blocks: List[Tuple[datetime, datetime]]
+    breaks: List[Break]  # Time periods with scaled activity
 
     # Markov state machine
     transition_matrix: List[List[float]]  # State transitions
@@ -71,6 +80,28 @@ class Config:
             errors.append(
                 f"weekly_weights needs 7 values, got {len(self.weekly_weights)}"
             )
+
+        # Validate breaks
+        for i, brk in enumerate(self.breaks):
+            if brk.start > brk.end:
+                errors.append(f"Break {i + 1}: start must be <= end")
+            if brk.factor < 0:
+                errors.append(f"Break {i + 1}: factor must be >= 0")
+
+        # Check for overlapping breaks
+        for i in range(len(self.breaks)):
+            for j in range(i + 1, len(self.breaks)):
+                brk1 = self.breaks[i]
+                brk2 = self.breaks[j]
+                # Check if date ranges overlap
+                if (
+                    brk1.start.date() <= brk2.end.date()
+                    and brk1.end.date() >= brk2.start.date()
+                ):
+                    errors.append(
+                        f"Breaks overlap: {brk1.start.date()} to {brk1.end.date()} "
+                        f"and {brk2.start.date()} to {brk2.end.date()}"
+                    )
 
         if not self._validate_matrix(self.transition_matrix, 4, 4):
             errors.append("transition_matrix must be 4x4 with rows summing to 1")
@@ -119,17 +150,24 @@ class Config:
         if isinstance(data.get("repo_path"), str):
             data["repo_path"] = Path(data["repo_path"])
 
-        # Convert vacation blocks
-        if "vacation_blocks" in data:
-            blocks = []
-            for block in data["vacation_blocks"]:
-                start, end = block
+        # Convert breaks
+        if "breaks" in data:
+            breaks = []
+            for item in data["breaks"]:
+                if isinstance(item, dict):
+                    start = item["start"]
+                    end = item["end"]
+                    factor = item["factor"]
+                else:
+                    start, end, factor = item
+
                 if isinstance(start, str):
                     start = datetime.fromisoformat(start)
                 if isinstance(end, str):
                     end = datetime.fromisoformat(end)
-                blocks.append((start, end))
-            data["vacation_blocks"] = blocks
+
+                breaks.append(Break(start=start, end=end, factor=factor))
+            data["breaks"] = breaks
 
         config = Config(**data)
         config.validate()
@@ -141,8 +179,13 @@ class Config:
         data["start_date"] = self.start_date.isoformat()
         data["end_date"] = self.end_date.isoformat()
         data["repo_path"] = str(self.repo_path)
-        data["vacation_blocks"] = [
-            (start.isoformat(), end.isoformat()) for start, end in self.vacation_blocks
+        data["breaks"] = [
+            {
+                "start": brk.start.isoformat(),
+                "end": brk.end.isoformat(),
+                "factor": brk.factor,
+            }
+            for brk in self.breaks
         ]
         return data
 
@@ -228,19 +271,18 @@ class CommitGenerator:
         end_date = self.config.end_date.date()
 
         while current_date <= end_date:
-            if not self._is_vacation(current_date):
-                day_commits = self._generate_day_commits(current_date)
-                schedule.extend(day_commits)
+            day_commits = self._generate_day_commits(current_date)
+            schedule.extend(day_commits)
             current_date += timedelta(days=1)
 
         return sorted(schedule, key=lambda c: c.timestamp)
 
-    def _is_vacation(self, date: datetime.date) -> bool:
-        """Check if date falls within a vacation block."""
-        for start, end in self.config.vacation_blocks:
-            if start.date() <= date <= end.date():
-                return True
-        return False
+    def _get_break_factor(self, date: datetime.date) -> float:
+        """Get activity scale factor for a date."""
+        for brk in self.config.breaks:
+            if brk.start.date() <= date <= brk.end.date():
+                return brk.factor
+        return 1.0
 
     def _generate_day_commits(self, date: datetime.date) -> List[Commit]:
         """Generate all commits for a single day."""
@@ -251,7 +293,8 @@ class CommitGenerator:
 
         # Calculate expected commits for the day
         weekday_weight = self.config.weekly_weights[date.weekday()]
-        mean = self.config.state_means[state] * weekday_weight
+        break_factor = self._get_break_factor(date)
+        mean = self.config.state_means[state] * weekday_weight * break_factor
 
         # Sample commit count
         count = self.sampler.zero_inflated_negative_binomial(
@@ -684,7 +727,7 @@ def create_default_config() -> Config:
         end_date=datetime.now(),
         timezone=time.strftime("%Z"),
         weekly_weights=[1.0] * 7,
-        vacation_blocks=[],
+        breaks=[],
         transition_matrix=[
             [0.85, 0.10, 0.05, 0.00],  # off
             [0.15, 0.60, 0.20, 0.05],  # quiet
@@ -803,9 +846,10 @@ def main() -> None:
     # Generation arguments
     parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
     parser.add_argument(
-        "--vacation",
+        "--break",
         action="append",
-        help="Vacation period (start:end in YYYY-MM-DD format)",
+        dest="breaks",
+        help="Activity scaling period (start:end[:factor] in YYYY-MM-DD:YYYY-MM-DD[:FLOAT] format, factor defaults to 0)",
     )
 
     # Configuration file
@@ -829,6 +873,9 @@ def main() -> None:
 
     # Apply command-line overrides
     config = apply_cli_overrides(config, args)
+
+    # Validate after all modifications
+    config.validate()
 
     # Save config if requested
     if args.save_config:
@@ -953,12 +1000,27 @@ def apply_cli_overrides(config: Config, args: argparse.Namespace) -> Config:
     if args.dry_run:
         config.dry_run = True
 
-    # Parse vacation blocks
-    if args.vacation:
-        config.vacation_blocks = []
-        for vac in args.vacation:
-            start_str, end_str = vac.split(":")
-            config.vacation_blocks.append((parse_date(start_str), parse_date(end_str)))
+    # Parse breaks
+    if args.breaks:
+        config.breaks = []
+        for brk in args.breaks:
+            parts = brk.split(":")
+            if len(parts) == 2:
+                start_str, end_str = parts
+                factor = 0.0
+            elif len(parts) == 3:
+                start_str, end_str, factor_str = parts
+                factor = float(factor_str)
+            else:
+                raise ValueError(
+                    f"Invalid break format: {brk}. Expected START:END or START:END:FACTOR"
+                )
+
+            config.breaks.append(
+                Break(
+                    start=parse_date(start_str), end=parse_date(end_str), factor=factor
+                )
+            )
 
     return config
 
