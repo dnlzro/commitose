@@ -834,27 +834,30 @@ def main() -> None:
     )
 
     # Date arguments
-    parser.add_argument("--start-date", help="Start date (YYYY-MM-DD)")
-    parser.add_argument("--end-date", help="End date (YYYY-MM-DD)")
+    parser.add_argument("--start-date", help="start date (YYYY-MM-DD)")
+    parser.add_argument("--end-date", help="end date (YYYY-MM-DD)")
 
     # Git arguments
-    parser.add_argument("--repo-path", type=Path, help="Path to Git repository")
+    parser.add_argument("--repo-path", type=Path, help="path to Git repository")
     parser.add_argument("--user-name", help="Git author name")
     parser.add_argument("--user-email", help="Git author email")
-    parser.add_argument("--branch", help="Git branch name (default: main)")
+    parser.add_argument(
+        "--branch", help="Git branch name (default: %(default)s)", default="main"
+    )
 
     # Generation arguments
-    parser.add_argument("--seed", type=int, help="Random seed for reproducibility")
+    parser.add_argument("--seed", type=int, help="random seed for reproducibility")
     parser.add_argument(
         "--break",
-        action="append",
+        nargs="*",
+        action="extend",
         dest="breaks",
-        help="Activity scaling period (start:end[:factor] in YYYY-MM-DD:YYYY-MM-DD[:FLOAT] format, factor defaults to 0)",
+        help="scale average commits over a period by a factor (start-date:end-date[:factor], factor default: 0)",
     )
 
     # Configuration file
-    parser.add_argument("--config", type=Path, help="Load configuration from JSON")
-    parser.add_argument("--save-config", type=Path, help="Save configuration to JSON")
+    parser.add_argument("--config", type=Path, help="load configuration from JSON")
+    parser.add_argument("--save-config", type=Path, help="save configuration to JSON")
 
     # Runtime options
     parser.add_argument(
