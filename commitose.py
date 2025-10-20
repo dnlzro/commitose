@@ -345,7 +345,8 @@ class CommitGenerator:
 
         distribution = [0] * num_sessions
         for _ in range(total):
-            distribution[self.rng.randint(0, num_sessions - 1)] += 1
+            random_index = self.rng.randint(0, num_sessions - 1)
+            distribution[random_index] += 1
 
         return distribution
 
@@ -675,22 +676,30 @@ class Visualizer:
 
     def _build_month_labels(self, weeks: List[List[Optional[int]]]) -> str:
         """Build month label row for horizontal view."""
+        # Main idea: Build up a list of months associated with the week they
+        # start in
         months = [(self.start_date.strftime("%b"), 0)]
-        current_col = 0
+        current_week = 0
 
         for date in self.commit_map:
             month_abbr = date.strftime("%b")
             if month_abbr != months[-1][0]:
-                if current_col - months[-1][1] < 2:
+                # Encountered a new month
+                if current_week - months[-1][1] < 2:
+                    # Previous month would be cut off, so blank it
                     months[-1] = ("", months[-1][1])
-                months.append((month_abbr, current_col))
+                months.append((month_abbr, current_week))
             if date.weekday() == 6:
-                current_col += 1
+                # New week is beginning, so update column
+                current_week += 1
 
         labels = " " * 4
         for i in range(len(months) - 1):
             labels += months[i][0]
-            labels += " " * ((months[i + 1][1] - months[i][1]) * 2 - len(months[i][0]))
+            # Add spacing until next month's first week
+            week_delta = months[i + 1][1] - months[i][1]
+            spacing = week_delta * 2 - len(months[i][0])
+            labels += " " * spacing
         labels += months[-1][0]
 
         return labels
