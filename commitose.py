@@ -692,7 +692,7 @@ def create_default_config() -> Config:
             [0.00, 0.05, 0.25, 0.70],  # busy
         ],
         state_means=[0, 1, 3, 7],
-        state_dispersion=1.1,
+        state_dispersion=1.2,
         state_zero_inflation=[1.0, 0.3, 0.1, 0.05],
         session_windows=[(10, 30), (15, 0), (20, 30)],
         session_std_minutes=60,
